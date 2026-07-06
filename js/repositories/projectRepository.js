@@ -155,4 +155,15 @@ export const projectRepository = {
     await db.put(STORE, project);
     return project;
   },
+
+  // Exporting doesn't change project content, so this intentionally does
+  // NOT bump projectVersion or updatedAt (which would otherwise mark a
+  // cached AI report STALE just because someone downloaded a report).
+  async recordExport(id) {
+    const project = await db.get(STORE, id);
+    if (!project) return null;
+    project.lastExportedAt = nowIso();
+    await db.put(STORE, project);
+    return project;
+  },
 };

@@ -77,6 +77,10 @@ export const ROOM_TYPES = {
 // can hold custom (user-added) line items even with no seeded defaults.
 export const CATALOG_LESS_GROUPS = new Set(['Closet', 'Lighting']);
 
+// Groups where line items are typically labeled appliances/equipment with
+// manufacturer/model/serial plates worth OCR-scanning.
+export const EQUIPMENT_SCAN_GROUPS = new Set(['HVAC', 'Appliances']);
+
 export function allGroupNames() {
   const names = new Set();
   Object.values(SECTION_GROUPS).forEach((groups) => groups.forEach((g) => names.add(g)));

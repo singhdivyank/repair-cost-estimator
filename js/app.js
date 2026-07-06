@@ -5,15 +5,17 @@ import { renderProjectsScreen } from './screens/projectsScreen.js';
 import { openNewProjectWizard } from './screens/newProjectWizard.js';
 import { renderRoomsScreen } from './screens/roomsScreen.js';
 import { renderRoomDetailScreen } from './screens/roomDetailScreen.js';
+import { renderSummaryScreen } from './screens/summaryScreen.js';
+import { renderAiAdvisorScreen } from './screens/aiAdvisorScreen.js';
 import { projectRepository } from './repositories/projectRepository.js';
 
-const APP_VERSION = '0.2.0-phase2';
+const APP_VERSION = '0.5.0-phase5';
 
 const NAV_ITEMS = [
   { key: 'projects', label: 'Projects', icon: icons.projects },
   { key: 'rooms', label: 'Rooms', icon: icons.rooms },
   { key: 'summary', label: 'Summary', icon: icons.summary },
-  { key: 'more', label: 'More', icon: icons.more },
+  { key: 'advisor', label: 'Advisor', icon: icons.spark },
 ];
 
 let route = { screen: 'projects', projectId: localStore.getCurrentProjectId() };
@@ -65,6 +67,29 @@ async function renderTopbar() {
       route = { screen: 'projects', projectId: route.projectId };
       render();
     });
+  } else if (route.screen === 'summary') {
+    const project = route.projectId ? await projectRepository.get(route.projectId) : null;
+    topbar.innerHTML = `
+      <div class="brand-row">
+        <button class="btn btn-icon" id="btn-to-projects" aria-label="All projects">${icons.projects}</button>
+        <div class="topbar-title">Summary${project ? ` &middot; ${escapeHtml(project.address)}` : ''}</div>
+      </div>
+    `;
+    document.getElementById('btn-to-projects').addEventListener('click', () => {
+      route = { screen: 'projects', projectId: route.projectId };
+      render();
+    });
+  } else if (route.screen === 'advisor') {
+    topbar.innerHTML = `
+      <div class="brand-row">
+        <button class="btn btn-icon" id="btn-to-projects" aria-label="All projects">${icons.projects}</button>
+        <div class="topbar-title">AI Advisor</div>
+      </div>
+    `;
+    document.getElementById('btn-to-projects').addEventListener('click', () => {
+      route = { screen: 'projects', projectId: route.projectId };
+      render();
+    });
   } else {
     topbar.innerHTML = `
       <div>
@@ -82,7 +107,7 @@ function escapeHtml(str = '') {
 function renderBottomNav() {
   const nav = document.getElementById('bottom-nav');
   nav.innerHTML = NAV_ITEMS.map((item) => {
-    const disabled = item.key !== 'projects' && !route.projectId;
+    const disabled = (item.key === 'rooms' || item.key === 'summary') && !route.projectId;
     return `
       <button class="nav-btn ${route.screen === item.key ? 'active' : ''}" data-nav="${item.key}" ${disabled ? 'disabled' : ''}>
         ${item.icon}
@@ -94,6 +119,7 @@ function renderBottomNav() {
     btn.addEventListener('click', () => {
       route.screen = btn.dataset.nav;
       if (btn.dataset.nav === 'rooms') route.roomId = null;
+      if (btn.dataset.nav === 'advisor') route.aiProjectId = null;
       render();
     });
   });
@@ -127,6 +153,26 @@ async function renderScreen() {
         },
       });
     }
+  } else if (route.screen === 'summary' && route.projectId) {
+    await renderSummaryScreen(root, {
+      projectId: route.projectId,
+      onOpenRoom: (roomId) => {
+        route = { screen: 'rooms', projectId: route.projectId, roomId };
+        render();
+      },
+    });
+  } else if (route.screen === 'advisor') {
+    await renderAiAdvisorScreen(root, {
+      aiProjectId: route.aiProjectId,
+      onSelectProject: (id) => {
+        route.aiProjectId = id;
+        render();
+      },
+      onBack: () => {
+        route.aiProjectId = null;
+        render();
+      },
+    });
   } else {
     root.innerHTML = `
       <div class="empty-state">
