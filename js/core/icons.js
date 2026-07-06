@@ -1,0 +1,33 @@
+// Minimal stroke-icon set. Kept as plain strings (no icon font / external
+// dependency) so everything renders offline with zero extra requests.
+const stroke = (paths, extra = '') =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra}>${paths}</svg>`;
+
+export const icons = {
+  projects: stroke('<rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="15" width="7" height="7" rx="1.5"/><rect x="14" y="15" width="7" height="7" rx="1.5"/>'),
+  rooms: stroke('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>'),
+  summary: stroke('<path d="M4 19V9M10 19V4M16 19v-7M22 19H2"/>'),
+  more: stroke('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'),
+  search: stroke('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>'),
+  plus: stroke('<path d="M12 5v14M5 12h14"/>'),
+  dots: stroke('<circle cx="12" cy="6" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="18" r="1.6"/>'),
+  edit: stroke('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  copy: stroke('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'),
+  archive: stroke('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M10 13h4"/>'),
+  trash: stroke('<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>'),
+  close: stroke('<path d="M18 6 6 18M6 6l12 12"/>'),
+  home: stroke('<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/>'),
+  bath: stroke('<path d="M9 6V4.5a1.5 1.5 0 0 1 3 0"/><path d="M4 12h17a1 1 0 0 1 1 1 6 6 0 0 1-6 6H9a6 6 0 0 1-6-6 1 1 0 0 1 1-1Z"/><path d="M7 19v2M17 19v2"/>'),
+  kitchen: stroke('<path d="M6 2v7a3 3 0 0 0 3 3v10"/><path d="M6 2v7"/><path d="M9 2v7"/><path d="M17 2c-1.5 0-3 1.5-3 4v3a2 2 0 0 0 2 2h1v11"/>'),
+  bed: stroke('<path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M3 18v3M21 18v3"/><path d="M3 12V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"/>'),
+  sofa: stroke('<path d="M4 13V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5"/><path d="M3 13h18v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M5 19v2M19 19v2"/>'),
+  camera: stroke('<path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="14" r="3.5"/>'),
+  spark: stroke('<path d="M12 2 2 12l10 10 10-10Z"/><path d="M8 12l4 4 4-4-4-4Z"/>', 'stroke-width="1.4"'),
+  check: stroke('<path d="M20 6 9 17l-5-5"/>'),
+  chevronRight: stroke('<path d="m9 18 6-6-6-6"/>'),
+  chevronDown: stroke('<path d="m6 9 6 6 6-6"/>'),
+  filter: stroke('<path d="M4 6h16M7 12h10M10 18h4"/>'),
+  arrowLeft: stroke('<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>'),
+  minus: stroke('<path d="M5 12h14"/>'),
+  ban: stroke('<circle cx="12" cy="12" r="9"/><path d="m5.5 5.5 13 13"/>'),
+};
