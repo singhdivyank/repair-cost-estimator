@@ -1,4 +1,3 @@
-/* Design tokens ------------------------------------------------------- */
 :root {
   --bg-base: #0b0d0f;
   --bg-surface: #15181c;
@@ -48,7 +47,6 @@ input, select, textarea { font-family: inherit; }
 
 .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 
-/* App shell ------------------------------------------------------------ */
 #app-shell {
   max-width: 480px;
   margin: 0 auto;
@@ -84,7 +82,6 @@ main.screen {
   overflow-y: auto;
 }
 
-/* Bottom nav ------------------------------------------------------------ */
 .bottom-nav {
   position: fixed;
   left: 0; right: 0; bottom: 0;
@@ -116,7 +113,6 @@ main.screen {
 .nav-btn svg { width: 22px; height: 22px; }
 .nav-btn:disabled { opacity: 0.35; }
 
-/* Buttons ---------------------------------------------------------------- */
 .btn {
   appearance: none;
   border: none;
@@ -160,7 +156,6 @@ main.screen {
   box-shadow: 0 4px 14px rgba(212, 81, 1, 0.35);
 }
 
-/* Inputs ------------------------------------------------------------------ */
 .field { margin-bottom: 16px; }
 .field label {
   display: block;
@@ -205,7 +200,6 @@ main.screen {
   min-height: 36px;
 }
 
-/* Search ------------------------------------------------------------------ */
 .search-bar {
   display: flex;
   align-items: center;
@@ -240,7 +234,6 @@ main.screen {
 }
 .chip.active { background: var(--accent-soft); color: var(--accent-text); border-color: rgba(212, 81, 1, 0.4); }
 
-/* Project cards ------------------------------------------------------------ */
 .project-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -290,7 +283,6 @@ main.screen {
 }
 .card-menu-btn:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
 
-/* Empty state ---------------------------------------------------------------- */
 .empty-state {
   text-align: center;
   padding: 64px 24px 24px;
@@ -300,7 +292,6 @@ main.screen {
 .empty-state h3 { font-size: 16px; color: var(--text-primary); margin-bottom: 6px; }
 .empty-state p { font-size: 13.5px; line-height: 1.5; }
 
-/* Modal / sheet ---------------------------------------------------------------- */
 .sheet-backdrop {
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.55);
@@ -340,7 +331,6 @@ main.screen {
 .action-item svg { width: 20px; height: 20px; color: var(--text-secondary); flex-shrink: 0; }
 .action-item.danger svg { color: var(--danger); }
 
-/* Toast --------------------------------------------------------------------- */
 .toast {
   position: fixed;
   bottom: calc(96px + var(--safe-bottom));
@@ -358,12 +348,10 @@ main.screen {
   max-width: 90%;
 }
 
-/* Reduced motion --------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
-/* Group accordion (Room Detail) ------------------------------------------------ */
 .group-list { display: flex; flex-direction: column; gap: 10px; }
 .group-card {
   background: var(--bg-surface);
@@ -456,7 +444,6 @@ main.screen {
   text-align: center;
 }
 
-/* Photo strip + equipment scan (Room Detail) --------------------------------------- */
 .repair-item-block { border-bottom: 1px solid var(--border-subtle); }
 .repair-item-block:last-of-type { border-bottom: none; }
 .repair-item-block .repair-row { border-bottom: none; }
@@ -551,7 +538,6 @@ main.screen {
 .spin svg { width: 28px; height: 28px; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* Summary screen ------------------------------------------------------------------- */
 .section-heading {
   font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text-tertiary); margin-bottom: 8px;
@@ -586,7 +572,6 @@ main.screen {
 .export-warning svg { width: 16px; height: 16px; flex-shrink: 0; }
 .export-btn svg { width: 18px; height: 18px; }
 
-/* AI Advisor ------------------------------------------------------------------------ */
 .advisor-project-row {
   width: 100%;
   display: flex; align-items: center; justify-content: space-between;
@@ -603,7 +588,6 @@ main.screen {
 .advisor-project-row .project-meta { display: flex; align-items: center; gap: 5px; }
 .advisor-project-row .project-meta svg { width: 13px; height: 13px; }
 
-/* Focus visibility ---------------------------------------------------------------- */
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
