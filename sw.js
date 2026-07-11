@@ -1,6 +1,5 @@
-// Service worker: offline-first shell. Bump CACHE_VERSION whenever any
-// precached file changes so clients pick up the update.
-const CACHE_VERSION = 'v5';
+// Service worker: offline-first shell
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `spark-estimator-${CACHE_VERSION}`;
 
 // Every static file the app needs to run with zero connectivity.

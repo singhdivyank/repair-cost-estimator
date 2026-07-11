@@ -13,11 +13,11 @@ export function openNewProjectWizard({ onCreated }) {
       </div>
       <form id="new-project-form">
         <div class="field">
-          <label for="address">Property address</label>
+          <label for="address">Property Address</label>
           <input class="input" id="address" name="address" placeholder="1422 Elm Street" required autofocus />
         </div>
         <div class="field">
-          <label for="propertyType">Property type</label>
+          <label for="propertyType">Property Type</label>
           <select class="input" id="propertyType" name="propertyType">
             <option value="single_family">Single Family</option>
             <option value="duplex">Duplex</option>
@@ -37,7 +37,7 @@ export function openNewProjectWizard({ onCreated }) {
         </div>
         <div class="input-row">
           <div class="field">
-            <label for="squareFootage">Square footage</label>
+            <label for="squareFootage">Square Footage</label>
             <input class="input" id="squareFootage" name="squareFootage" type="number" min="0" placeholder="1450" />
           </div>
           <div class="field">
@@ -50,18 +50,19 @@ export function openNewProjectWizard({ onCreated }) {
         </div>
         <div class="input-row">
           <div class="field">
-            <label for="purchasePrice">Purchase price</label>
-            <input class="input" id="purchasePrice" name="purchasePrice" type="number" min="0" placeholder="145000" />
+            <label for="purchasePrice">Purchase Price</label>
+            <input class="input" id="purchasePrice" name="purchasePrice" type="number" min="1" placeholder="145000" required />
           </div>
           <div class="field">
-            <label for="arv">ARV</label>
-            <input class="input" id="arv" name="arv" type="number" min="0" placeholder="245000" />
+            <label for="arv">ARV <span style="color:var(--text-tertiary); font-weight:400;">(required)</span></label>
+            <input class="input" id="arv" name="arv" type="number" min="1" placeholder="245000" required />
           </div>
         </div>
         <div class="field">
-          <label for="targetMarginPct">Target profit margin (%)</label>
-          <input class="input" id="targetMarginPct" name="targetMarginPct" type="number" min="0" max="100" value="20" />
+          <label for="targetMarginPct">Target Profit Margin (%) <span style="color:var(--text-tertiary); font-weight:400;">(required)</span></label>
+          <input class="input" id="targetMarginPct" name="targetMarginPct" type="number" min="0" max="100" placeholder="20" required />
         </div>
+        <p style="color:var(--text-tertiary); font-size:12px; margin:-10px 0 16px;">Purchase price, ARV, and target margin are required so profit/loss can be tracked against your goal throughout the walkthrough.</p>
         <div class="sheet-actions">
           <button type="button" class="btn btn-secondary btn-block" data-act="close">Cancel</button>
           <button type="submit" class="btn btn-primary btn-block">Create Project</button>

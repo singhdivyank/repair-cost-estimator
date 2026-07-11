@@ -3,7 +3,7 @@ import { roomRepository } from '../repositories/roomRepository.js';
 import { pricingService } from '../services/pricingService.js';
 import { exportService } from '../services/exportService.js';
 import { icons } from '../core/icons.js';
-import { formatCurrency } from '../core/utils.js';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '../core/utils.js';
 
 function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -75,8 +75,8 @@ export async function renderSummaryScreen(root, { projectId, onOpenRoom }) {
       </div>
       ${financials ? `
         <div style="display:flex; gap:20px; margin-top:14px; padding-top:14px; border-top:1px solid var(--border-subtle);">
-          <div><div class="project-meta">Est. Profit</div><div class="num" style="font-weight:700; color:${financials.profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${formatCurrency(financials.profit)}</div></div>
-          <div><div class="project-meta">Est. ROI</div><div class="num" style="font-weight:700;">${financials.roi.toFixed(1)}%</div></div>
+          <div><div class="project-meta">Profit / Loss</div><div class="num" style="font-weight:700; color:${financials.meetsTarget ? 'var(--success)' : 'var(--danger)'};">${formatSignedCurrency(financials.profit)}</div></div>
+          <div><div class="project-meta">Margin <span class="num">(target ${project.targetMarginPct}%)</span></div><div class="num" style="font-weight:700; color:${financials.meetsTarget ? 'var(--success)' : 'var(--danger)'};">${formatSignedPercent(financials.marginPct)}</div></div>
         </div>
       ` : ''}
     </div>

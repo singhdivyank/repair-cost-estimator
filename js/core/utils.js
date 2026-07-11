@@ -22,6 +22,21 @@ export function formatCurrency(n) {
   return '$' + Math.round(value).toLocaleString('en-US');
 }
 
+// For figures where the sign itself is meaningful (profit vs. loss) —
+// explicit "+" on gains, "-" on losses, rather than relying on the reader
+// to notice a bare minus sign next to a color.
+export function formatSignedCurrency(n) {
+  const value = Number.isFinite(n) ? n : 0;
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return sign + '$' + Math.round(Math.abs(value)).toLocaleString('en-US');
+}
+
+export function formatSignedPercent(n, decimals = 1) {
+  const value = Number.isFinite(n) ? n : 0;
+  const sign = value > 0 ? '+' : '';
+  return sign + value.toFixed(decimals) + '%';
+}
+
 export function formatDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);

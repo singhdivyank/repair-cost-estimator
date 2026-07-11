@@ -2,7 +2,7 @@ import { projectRepository } from '../repositories/projectRepository.js';
 import { roomRepository } from '../repositories/roomRepository.js';
 import { pricingService } from '../services/pricingService.js';
 import { icons } from '../core/icons.js';
-import { formatCurrency } from '../core/utils.js';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '../core/utils.js';
 import { WHOLE_HOUSE_ROOMS, ROOM_TYPES } from '../data/roomTemplates.js';
 
 const ROOM_TYPE_ICON = { bathroom: icons.bath, kitchen: icons.kitchen, bedroom: icons.bed, living: icons.sofa };
@@ -71,12 +71,12 @@ export async function renderRoomsScreen(root, { projectId, onOpenRoom }) {
       ${financials ? `
         <div style="display:flex; gap:20px; margin-top:14px; padding-top:14px; border-top:1px solid var(--border-subtle);">
           <div>
-            <div class="project-meta">Est. Profit</div>
-            <div class="num" style="font-weight:700; color:${financials.profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${formatCurrency(financials.profit)}</div>
+            <div class="project-meta">Profit / Loss</div>
+            <div class="num" style="font-weight:700; color:${financials.meetsTarget ? 'var(--success)' : 'var(--danger)'};">${formatSignedCurrency(financials.profit)}</div>
           </div>
           <div>
-            <div class="project-meta">Est. ROI</div>
-            <div class="num" style="font-weight:700;">${financials.roi.toFixed(1)}%</div>
+            <div class="project-meta">Margin <span class="num">(target ${project.targetMarginPct}%)</span></div>
+            <div class="num" style="font-weight:700; color:${financials.meetsTarget ? 'var(--success)' : 'var(--danger)'};">${formatSignedPercent(financials.marginPct)}</div>
           </div>
         </div>
       ` : ''}

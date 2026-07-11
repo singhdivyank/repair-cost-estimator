@@ -83,7 +83,7 @@ async function renderTopbar() {
     topbar.innerHTML = `
       <div class="brand-row">
         <button class="btn btn-icon" id="btn-to-projects" aria-label="All projects">${icons.projects}</button>
-        <div class="topbar-title">AI Advisor</div>
+        <div class="topbar-title">AI Investment Advisor</div>
       </div>
     `;
     document.getElementById('btn-to-projects').addEventListener('click', () => {

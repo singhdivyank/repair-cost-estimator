@@ -167,7 +167,11 @@ export const pricingService = {
     const totalCost = project.purchasePrice + totalRepairCost;
     const profit = project.arv - totalCost;
     const roi = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+    // Margin is expressed as % of ARV so it's directly comparable to
+    // targetMarginPct, which is defined the same way at project setup.
+    const marginPct = project.arv > 0 ? (profit / project.arv) * 100 : 0;
     const targetProfit = project.targetMarginPct ? (project.arv * project.targetMarginPct) / 100 : null;
-    return { profit, roi, totalCost, targetProfit };
+    const meetsTarget = project.targetMarginPct != null ? profit >= 0 && marginPct >= project.targetMarginPct : profit >= 0;
+    return { profit, roi, totalCost, targetProfit, marginPct, meetsTarget };
   },
 };
