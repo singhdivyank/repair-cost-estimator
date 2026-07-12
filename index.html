@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#0b0d0f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Scope Estimator" />
+  <meta name="apple-mobile-web-app-title" content="Cost Estimator" />
   <meta name="mobile-web-app-capable" content="yes" />
 
   <style>
@@ -2896,20 +2896,32 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     "Coleman",
     "Heil"
   ];
+  var CODE_PATTERN = /\b(?=[A-Z0-9-]{5,20}\b)(?=[A-Z0-9-]*[0-9])(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]{5,20}\b/gi;
   function parseEquipmentText(rawText, confidence) {
-    const text = rawText || "";
+    const text = (rawText || "").trim();
     const upper = text.toUpperCase();
-    const manufacturer = KNOWN_MANUFACTURERS.find((m) => upper.includes(m.toUpperCase())) || null;
-    const modelMatch = text.match(/model\s*(no\.?|number|#)?[:\s]+([A-Z0-9][A-Z0-9\-\/]{3,})/i);
-    const serialMatch = text.match(/(serial|s\/n|ser\.?)\s*(no\.?|number|#)?[:\s]+([A-Z0-9][A-Z0-9\-\/]{3,})/i);
+    let manufacturer = KNOWN_MANUFACTURERS.find((m) => upper.includes(m.toUpperCase())) || null;
+    if (!manufacturer) {
+      const candidateLine = text.split("\n").map((l) => l.trim()).find((l) => l.length >= 3 && l.length <= 24 && /^[A-Za-z][A-Za-z .&-]*$/.test(l));
+      if (candidateLine) manufacturer = candidateLine;
+    }
+    const modelMatch = text.match(/model\s*(no\.?|number|#)?[:\s\n]+([A-Z0-9][A-Z0-9\-\/]{3,})/i);
+    const serialMatch = text.match(/(serial|s\/n|ser\.?)\s*(no\.?|number|#)?[:\s\n]+([A-Z0-9][A-Z0-9\-\/]{3,})/i);
     const yearMatch = text.match(/\b(19[8-9]\d|20[0-4]\d)\b/);
+    let model = modelMatch ? modelMatch[2].toUpperCase() : null;
+    let serialNumber = serialMatch ? serialMatch[3].toUpperCase() : null;
+    if (!model || !serialNumber) {
+      const candidates = Array.from(text.matchAll(CODE_PATTERN)).map((m) => m[0].toUpperCase()).filter((v, i, arr) => arr.indexOf(v) === i).filter((v) => v !== model && v !== serialNumber);
+      if (!serialNumber && candidates.length > 0) serialNumber = candidates[0];
+      if (!model && candidates.length > (serialNumber ? 1 : 0)) model = candidates[serialNumber === candidates[0] ? 1 : 0];
+    }
     return {
       manufacturer,
-      model: modelMatch ? modelMatch[2].toUpperCase() : null,
-      serialNumber: serialMatch ? serialMatch[3].toUpperCase() : null,
+      model,
+      serialNumber,
       manufactureDate: yearMatch ? yearMatch[1] : null,
       confidence: typeof confidence === "number" ? Math.round(confidence) : null,
-      extractedText: text.trim().slice(0, 800)
+      extractedText: text.slice(0, 800)
     };
   }
   var ocrService = {
@@ -3411,11 +3423,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
           <input class="input" id="eq-model" name="model" value="${escapeHtml3(result.model || "")}" placeholder="e.g. XR14" />
         </div>
         <div class="field">
-          <label for="eq-serial">Serial number</label>
+          <label for="eq-serial">Serial Number</label>
           <input class="input" id="eq-serial" name="serialNumber" value="${escapeHtml3(result.serialNumber || "")}" placeholder="e.g. 19191E3F1V" />
         </div>
         <div class="field">
-          <label for="eq-year">Manufacture year</label>
+          <label for="eq-year">Manufacture Year</label>
           <input class="input" id="eq-year" name="manufactureDate" value="${escapeHtml3(result.manufactureDate || "")}" placeholder="e.g. 2019" />
         </div>
         <div class="sheet-actions">
@@ -3791,8 +3803,87 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
   // src/js/services/aiService.js
   var TRANSFORMERS_CDN_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
-  var MODEL_ID = "onnx-community/Qwen2.5-0.5B-Instruct";
+  var MODEL_ID = "onnx-community/Qwen2.5-1.5B-Instruct";
   var generatorPromise = null;
+
+  var SYSTEM_PROMPT = `You are an AI Acquisition Assistant for Spark Homes.
+  Spark Homes purchases residential properties, renovates them, and resells them for profit.
+  Your job is to review an inspection report BEFORE an acquisition offer is submitted.
+  You are NOT an investment advisor.
+  You are NOT a real estate appraiser.
+  You are NOT a contractor.
+
+  Only use the information provided by the user.
+  Never invent market prices, neighborhood information, contractor rates, comparable sales, property values, or repair costs.
+  Your goal is to improve inspection quality and reduce uncertainty.
+  Provide insights that are NOT obvious from simply looking at the repair totals.
+
+  Focus on:
+  • Missing inspection information
+  • Missing equipment documentation
+  • Repairs that should be validated before submitting an offer
+  • Opportunities to bundle similar work across multiple rooms
+  • Repair items that deserve additional contractor quotes
+  • Areas where missing documentation increases financial uncertainty
+  • Operational actions that may improve acquisition margins
+
+  Do not simply restate repair totals.
+
+  Every insight must identify:
+  - uncertainty,
+  - missing information,
+  - inspection quality,
+  - operational efficiency,
+  or
+  - an action that reduces acquisition risk.
+
+  If an insight only summarizes a number already visible in the report, do not include it.
+
+  Those observations alone do not provide business value.
+  Every recommendation must explain WHY it matters.
+  If the provided information is insufficient, explicitly state what additional information would improve confidence instead of guessing.
+  Respond ONLY with a valid JSON object using exactly this schema:
+  {
+    "confidence": 0-100,
+    "summary": "2-3 sentence executive summary.",
+    "insights": [
+      {
+        "title": "Short title",
+        "reasoning": "Specific reasoning tied to the inspection data.",
+        "impact": "high|medium|low"
+      }
+    ],
+    "inspectionGaps": [
+      "Specific missing inspection information."
+    ],
+    "marginRisks": [
+      "Specific operational or financial uncertainty."
+    ],
+    "requiresHumanReview": true
+  }
+
+  Rules:
+  - Maximum 5 insights.
+  - Maximum 4 inspection gaps.
+  - Maximum 4 margin risks.
+  - Do not repeat information already visible in the repair summary.
+  - Do not recommend buying or rejecting the property.
+  - Do not invent facts.
+  - Return ONLY the JSON object.
+  
+  The following information is NOT available unless explicitly listed above:
+  - contractor quotations
+  - roof inspection
+  - electrical inspection
+  - plumbing inspection
+  - structural inspection
+  - neighborhood pricing
+  - comparable properties
+  - market values
+
+  If any recommendation depends on this information, identify it as missing instead of assuming it.
+  `;
+  
   async function loadGenerator(onProgress) {
     if (generatorPromise) return generatorPromise;
     generatorPromise = (async () => {
@@ -3821,28 +3912,123 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     })();
     return generatorPromise;
   }
-  var SYSTEM_PROMPT = `You are a residential real-estate investment advisor helping a house-flipping acquisition agent. Use ONLY the inspection and financial data provided in the user message \u2014 never invent market data, comparable sales, or facts that were not given. Respond with a single valid JSON object and NOTHING else: no markdown, no code fences, no commentary before or after. Match exactly this shape:
-{"opportunityScore": <integer 0-100>, "executiveSummary": "<2-3 sentences>", "recommendations": [{"title": "<short title>", "reasoning": "<1 sentence>", "priority": "high|medium|low"}], "risks": ["<short risk>"], "expectedProfitIncrease": <integer dollar amount, 0 if unknown>}
-Include at most 5 recommendations and at most 4 risks.`;
   function buildUserPrompt(project, rows, categories, financials, equipmentSummary) {
     const lines = [];
-    lines.push(`Property: ${project.address} (${project.propertyType || "unknown type"}, ${project.bedrooms} bd / ${project.bathrooms} ba${project.squareFootage ? `, ${project.squareFootage} sqft` : ""})`);
-    if (project.purchasePrice) lines.push(`Purchase price: $${project.purchasePrice}`);
-    if (project.arv) lines.push(`After-repair value (ARV): $${project.arv}`);
-    if (project.targetMarginPct) lines.push(`Target profit margin: ${project.targetMarginPct}%`);
-    const total = rows.reduce((s, r) => s + r.lineTotal, 0);
-    lines.push(`Total repair estimate: $${Math.round(total)}`);
+    const totalRepairCost = rows.reduce((s, r) => s + (r.lineTotal || 0), 0);
+    const completedRepairs = rows.filter(r => (r.quantity || 0) > 0).length;
+    const totalRepairs = rows.length;
+    const roomNames = [...new Set(rows.map(r => r.roomName).filter(Boolean))];
+    const equipmentCount = equipmentSummary.length;
+
+    lines.push("=== PROPERTY ===");
+    lines.push(`Address: ${project.address || "Unknown"}`);
+    lines.push(`Property Type: ${project.propertyType || "Unknown"}`);
+    lines.push(`Bedrooms: ${project.bedrooms || 0}`);
+    lines.push(`Bathrooms: ${project.bathrooms || 0}`);
+
+    if (project.squareFootage)
+      lines.push(`Square Footage: ${project.squareFootage}`);
+
+    if (project.purchasePrice)
+      lines.push(`Purchase Price: $${Math.round(project.purchasePrice)}`);
+
+    if (project.arv)
+      lines.push(`After Repair Value (ARV): $${Math.round(project.arv)}`);
+
+    if (project.targetMarginPct)
+      lines.push(`Target Margin: ${project.targetMarginPct}%`);
+
+    lines.push("");
+    lines.push("=== FINANCIAL SUMMARY ===");
+    lines.push(`Total Repair Estimate: $${Math.round(totalRepairCost)}`);
+
     if (financials) {
-      lines.push(`Estimated total cost (purchase + repairs): $${Math.round(financials.totalCost)}`);
-      lines.push(`Estimated profit: $${Math.round(financials.profit)}`);
+      lines.push(`Estimated Total Cost: $${Math.round(financials.totalCost)}`);
+      lines.push(`Estimated Profit: $${Math.round(financials.profit)}`);
       lines.push(`Estimated ROI: ${financials.roi.toFixed(1)}%`);
     }
-    lines.push("Repair cost by category:");
-    categories.slice(0, 8).forEach((c) => lines.push(`- ${c.group}: $${Math.round(c.total)}`));
-    if (equipmentSummary.length > 0) {
-      lines.push("Scanned equipment:");
-      equipmentSummary.forEach((e) => lines.push(`- ${e}`));
+
+    lines.push("");
+    lines.push("=== INSPECTION SUMMARY ===");
+    lines.push(`Rooms Inspected: ${roomNames.length}`);
+    lines.push(`Repair Items: ${completedRepairs}/${totalRepairs}`);
+    lines.push(`Equipment Records Captured: ${equipmentCount}`);
+    lines.push("");
+    lines.push("=== REPAIR COST BREAKDOWN ===");
+
+    categories
+      .sort((a, b) => b.total - a.total)
+      .forEach(c => {
+        const pct = totalRepairCost
+          ? ((c.total / totalRepairCost) * 100).toFixed(1)
+          : "0";
+
+        lines.push(
+          `${c.group}: $${Math.round(c.total)} (${pct}% of repair budget)`
+        );
+      });
+
+    lines.push("");
+    lines.push("=== DETAILED REPAIR ITEMS ===");
+
+    const roomGroups = {};
+    rows.forEach(r => {
+      const room = r.roomName || "Unknown Room";
+      if (!roomGroups[room]) {
+        roomGroups[room] = [];
+      }
+
+      roomGroups[room].push(r);
+    });
+
+    Object.entries(roomGroups).forEach(([room, repairs]) => {
+      lines.push("");
+      lines.push(`[${room}]`);
+
+      repairs.forEach(r => {
+        const qty = r.quantity || 0;
+        const unit = Math.round(r.unitPrice || 0);
+        const total = Math.round(r.lineTotal || 0);
+
+        const flags = [];
+
+        if (r.noAction)
+          flags.push("No Action");
+        if (r.completed)
+          flags.push("Completed");
+        if (r.notes)
+          flags.push(`Notes: ${r.notes}`);
+
+        lines.push(
+          `- ${r.category || "Repair"} | ${r.name || r.description || "Item"} | Qty:${qty} | Unit:$${unit} | Total:$${total}${flags.length ? " | " + flags.join(" | ") : ""}`
+        );
+      });
+    });
+
+    if (equipmentSummary.length) {
+      lines.push("");
+      lines.push("=== EQUIPMENT DOCUMENTATION ===");
+
+      equipmentSummary.forEach(e => {
+        lines.push(`- ${e}`);
+      });
     }
+
+    lines.push("");
+    lines.push("=== BUSINESS OBJECTIVE ===");
+    lines.push("Spark Homes acquires residential properties for renovation and resale.");
+    lines.push("Do NOT decide whether the property should be purchased.");
+    lines.push("Instead, review the inspection for uncertainty, missing information, operational improvements, contractor validation opportunities, duplicate work across rooms, and ways the acquisition team could reduce repair uncertainty before submitting an offer.");
+    lines.push("");
+    lines.push("Focus on recommendations that:");
+    lines.push("- identify missing inspection information");
+    lines.push("- identify missing equipment documentation");
+    lines.push("- identify repair items that should be validated");
+    lines.push("- identify work that can be bundled across rooms");
+    lines.push("- identify opportunities to reduce uncertainty");
+    lines.push("- explain WHY each recommendation matters");
+    lines.push("- DO NOT simply restate the largest repair categories");
+
     return lines.join("\n");
   }
   function tryParseJson(text) {
@@ -3859,54 +4045,151 @@ Include at most 5 recommendations and at most 4 risks.`;
   }
   function validateReportShape(obj) {
     if (!obj || typeof obj !== "object") return false;
-    if (typeof obj.opportunityScore !== "number") return false;
-    if (typeof obj.executiveSummary !== "string" || !obj.executiveSummary.trim()) return false;
-    if (!Array.isArray(obj.recommendations)) return false;
-    if (!Array.isArray(obj.risks)) return false;
+    if (typeof obj.confidence !== "number") return false;
+    if (typeof obj.summary !== "string") return false;
+    if (!Array.isArray(obj.insights)) return false;
+    if (!Array.isArray(obj.inspectionGaps)) return false;
+    if (!Array.isArray(obj.marginRisks)) return false;
     return true;
   }
   function normalizeReport(obj) {
-    const priorityRank = { high: 0, medium: 1, low: 2 };
-    const recommendations = (obj.recommendations || []).filter((r) => r && r.title).map((r) => ({
-      title: String(r.title).slice(0, 120),
-      reasoning: String(r.reasoning || "").slice(0, 300),
-      priority: ["high", "medium", "low"].includes(r.priority) ? r.priority : "medium"
-    })).sort((a, b) => (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1)).slice(0, 5);
-    return {
-      opportunityScore: Math.max(0, Math.min(100, Math.round(obj.opportunityScore))),
-      executiveSummary: String(obj.executiveSummary).slice(0, 800),
-      recommendations,
-      risks: (obj.risks || []).filter(Boolean).map((r) => String(r).slice(0, 200)).slice(0, 4),
-      expectedProfitIncrease: typeof obj.expectedProfitIncrease === "number" ? Math.round(obj.expectedProfitIncrease) : 0
+    requiresHumanReview: !!obj.requiresHumanReview
+    
+    const priorityRank = {
+      high: 0,
+      medium: 1,
+      low: 2
     };
-  }
-  function buildFallbackReport(project, rows, categories, financials) {
-    const total = rows.reduce((s, r) => s + r.lineTotal, 0);
-    let opportunityScore = 50;
-    if (financials) {
-      if (financials.roi >= 20) opportunityScore = 85;
-      else if (financials.roi >= 10) opportunityScore = 70;
-      else if (financials.roi >= 0) opportunityScore = 55;
-      else opportunityScore = 30;
-    }
-    const top = categories.slice(0, 3);
-    const recommendations = top.map((c, i) => ({
-      title: `Review ${c.group} costs`,
-      reasoning: `${c.group} is ${i === 0 ? "the largest" : "a significant"} cost driver at $${Math.round(c.total)} \u2014 get a second quote before locking the budget.`,
-      priority: i === 0 ? "high" : "medium"
-    }));
-    const risks = [];
-    if (financials && financials.roi < 10) risks.push("Estimated ROI is below a typical 10% threshold for flips \u2014 margin is thin if costs run over.");
-    if (project.purchasePrice && total > project.purchasePrice * 0.5) risks.push("Repair estimate exceeds 50% of purchase price \u2014 verify structural/systems items closely.");
-    if (risks.length === 0) risks.push("No major risk flags from the numbers alone \u2014 confirm with a full contractor walkthrough.");
+
+    const recommendations =
+      (obj.insights || [])
+        .filter(r => r && r.title)
+        .map(r => ({
+          title: String(r.title).slice(0,120),
+          reasoning: String(r.reasoning || "").slice(0,300),
+          priority: ["high","medium","low"].includes(r.impact)
+            ? r.impact
+            : "medium"
+        }))
+        .sort((a,b)=>
+          priorityRank[a.priority]-priorityRank[b.priority])
+        .slice(0,5);
+
+    const risks = [
+      ...(obj.marginRisks || []),
+      ...(obj.inspectionGaps || [])
+    ]
+    .filter(Boolean)
+    .map(r=>String(r).slice(0,200))
+    .slice(0,5);
+
     return {
-      opportunityScore,
-      executiveSummary: financials ? `Based on the numbers entered, this deal projects roughly $${Math.round(financials.profit)} in profit (${financials.roi.toFixed(1)}% ROI) after an estimated $${Math.round(total)} in repairs.` : `Total repair estimate is $${Math.round(total)}. Add a purchase price and ARV to this project for profit/ROI analysis.`,
+      opportunityScore:
+        Math.max(0,
+          Math.min(100,Math.round(obj.confidence))),
+      executiveSummary:
+        String(obj.summary).slice(0,800),
       recommendations,
       risks,
-      expectedProfitIncrease: 0
+      expectedProfitIncrease:0
     };
   }
+  // function buildFallbackReport(project, rows, categories, financials) {
+  //   const total = rows.reduce((s, r) => s + r.lineTotal, 0);
+  //   let opportunityScore = 50;
+  //   if (financials) {
+  //     if (financials.roi >= 30) opportunityScore = 90;
+  //     else if (financials.roi >= 20) opportunityScore = 80;
+  //     else if (financials.roi >= 10) opportunityScore = 65;
+  //     else if (financials.roi >= 0) opportunityScore = 50;
+  //     else opportunityScore = 25;
+  //   }
+
+  //   const recommendations = [];
+  //   // Highest-cost category
+  //   if (categories.length > 0) {
+  //     const top = categories[0];
+  //     recommendations.push({
+  //       title: `Validate ${top.group} estimate`,
+  //       reasoning: `${top.group} represents the largest portion of the repair budget. Obtain an additional contractor quote before finalizing the acquisition estimate.`,
+  //       priority: "high"
+  //     });
+  //   }
+
+  //   // Concentrated repair costs
+  //   const top3Total = categories.slice(0, 3).reduce((s, c) => s + c.total, 0);
+  //   if (total > 0 && top3Total / total > 0.6) {
+  //     recommendations.push({
+  //       title: "Focus on major cost drivers",
+  //       reasoning: "A large share of the repair budget is concentrated in a few categories. Small cost reductions in these areas can materially improve acquisition margins.",
+  //       priority: "medium"
+  //     });
+  //   }
+
+  //   // Large repair estimate
+  //   if (project.purchasePrice && total > project.purchasePrice * 0.4) {
+  //     recommendations.push({
+  //       title: "Verify high repair scope",
+  //       reasoning: "Repairs represent a significant percentage of the purchase price. Confirm major structural and mechanical items before submitting an offer.",
+  //       priority: "high"
+  //     });
+  //   }
+
+  //   // Equipment
+  //   const scannedEquipment = rows.filter(r => r.equipment).length;
+  //   if (scannedEquipment === 0) {
+  //     recommendations.push({
+  //       title: "Capture equipment information",
+  //       reasoning: "No HVAC or appliance equipment has been documented. Recording manufacturer, model and serial numbers can reduce uncertainty during repair estimation.",
+  //       priority: "medium"
+  //     });
+  //   }
+
+  //   const risks = [];
+  //   // ROI Risk
+  //   if (financials) {
+  //     if (financials.roi < 10) {
+  //       risks.push(
+  //         "Current projected ROI is below the target margin. Small increases in repair costs could significantly reduce profitability."
+  //       );
+  //     } else if (financials.roi < 20) {
+  //       risks.push(
+  //         "Projected ROI leaves limited room for unexpected repair costs."
+  //       );
+  //     }
+  //   }
+
+  //   // High repair ratio
+  //   if (project.purchasePrice && total > project.purchasePrice * 0.5) {
+  //     risks.push(
+  //       "Repair costs exceed half of the purchase price. Verify that no major inspection items have been overlooked."
+  //     );
+  //   }
+
+  //   if (risks.length === 0) {
+  //     risks.push(
+  //       "No significant numerical risk indicators were detected. Complete contractor validation and a final walkthrough before placing an offer."
+  //     );
+  //   }
+
+  //   const executiveSummary = financials
+  //     ? `The current estimate projects approximately $${Math.round(
+  //         financials.profit
+  //       )} in profit with an estimated ${financials.roi.toFixed(
+  //         1
+  //       )}% ROI. The repair estimate appears financially viable based on the available information, but final profitability depends on validating the highest-cost repair categories and completing any remaining inspection items.`
+  //     : `The total repair estimate is $${Math.round(
+  //         total
+  //       )}. Add the purchase price and after-repair value to evaluate expected profitability and acquisition margin.`;
+
+  //   return {
+  //     opportunityScore,
+  //     executiveSummary,
+  //     recommendations: recommendations.slice(0, 5),
+  //     risks: risks.slice(0, 4),
+  //     expectedProfitIncrease: 0
+  //   };
+  // }
   var aiService = {
     async generateReport(project, { onStatus } = {}) {
       const rows = await exportService.gatherLineItems(project);
@@ -3919,12 +4202,12 @@ Include at most 5 recommendations and at most 4 risks.`;
         return [parts, age].filter(Boolean).join(", ") || null;
       }).filter(Boolean);
       onStatus?.("loading-engine");
-      let generator;
-      try {
-        generator = await loadGenerator((p) => onStatus?.("downloading-model", p));
-      } catch (err) {
-        return { ...buildFallbackReport(project, rows, categories, financials), model: "fallback-heuristic", usedFallback: true, engineError: err.message };
-      }
+      let generator = await loadGenerator((p) => onStatus?.("downloading-model", p));
+      // try {
+      //   generator = await loadGenerator((p) => onStatus?.("downloading-model", p));
+      // } catch (err) {
+      //   return { ...buildFallbackReport(project, rows, categories, financials), model: "fallback-heuristic", usedFallback: true, engineError: err.message };
+      // }
       const userPrompt = buildUserPrompt(project, rows, categories, financials, equipmentSummary);
       const messages = [
         { role: "system", content: SYSTEM_PROMPT },
@@ -3935,7 +4218,7 @@ Include at most 5 recommendations and at most 4 risks.`;
       for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
         const promptMessages = attempt === 0 ? messages : [...messages, { role: "assistant", content: "(invalid JSON)" }, { role: "user", content: "That was not valid JSON. Respond again with ONLY the JSON object, no other text." }];
         try {
-          const output = await generator(promptMessages, { max_new_tokens: 450, do_sample: false });
+          const output = await generator(promptMessages, { max_new_tokens: 700, do_sample: false });
           const text = output?.[0]?.generated_text?.at?.(-1)?.content || "";
           const candidate = tryParseJson(text);
           if (candidate && validateReportShape(candidate)) parsed = candidate;
@@ -4057,13 +4340,13 @@ Include at most 5 recommendations and at most 4 risks.`;
     <div class="project-card" style="margin-bottom:18px; display:flex; gap:12px; align-items:flex-start;">
       <div style="color:var(--accent-text); flex-shrink:0;">${icons.spark}</div>
       <div>
-        <div style="font-weight:700; margin-bottom:4px;">AI Investment Advisor</div>
+        <div style="font-weight:700; margin-bottom:4px;">AI Advisor</div>
         <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.5;">Runs a real language model entirely on your device \u2014 no data leaves your phone, and once the model is downloaded it works with zero signal. Only available for completed projects.</p>
       </div>
     </div>
 
     ${eligible.length > 0 ? `
-      <h3 class="section-heading">Completed Projects</h3>
+      <h3 class="section-heading">Completed Properties</h3>
       <div class="project-card" style="padding:4px 8px; margin-bottom:18px;">
         ${eligible.map((p) => projectPickerRow(p, { locked: false })).join("")}
       </div>
@@ -4079,8 +4362,8 @@ Include at most 5 recommendations and at most 4 risks.`;
     ${eligible.length === 0 && locked.length === 0 ? `
       <div class="empty-state">
         <div class="mark">${icons.spark}</div>
-        <h3>No projects yet</h3>
-        <p>Create and complete a project to unlock the AI Advisor.</p>
+        <h3>No properties yet</h3>
+        <p>Create and complete a property to unlock the AI Advisor.</p>
       </div>
     ` : ""}
   `;
@@ -4107,7 +4390,7 @@ Include at most 5 recommendations and at most 4 risks.`;
       <button class="btn btn-icon" data-action="back" aria-label="Back">${icons.arrowLeft}</button>
       <div style="flex:1; min-width:0;">
         <div style="font-size:17px; font-weight:700;">${escapeHtml5(project.address)}</div>
-        <div class="project-meta">AI Investment Advisor</div>
+        <div class="project-meta">AI Advisor</div>
       </div>
     </div>
   `;
@@ -4234,7 +4517,7 @@ Include at most 5 recommendations and at most 4 risks.`;
   // src/js/app.js
   var APP_VERSION = "0.5.0-phase5";
   var NAV_ITEMS = [
-    { key: "projects", label: "Projects", icon: icons.projects },
+    { key: "projects", label: "Properties", icon: icons.projects },
     { key: "rooms", label: "Rooms", icon: icons.rooms },
     { key: "summary", label: "Summary", icon: icons.summary },
     { key: "advisor", label: "Advisor", icon: icons.spark }
@@ -4301,7 +4584,7 @@ Include at most 5 recommendations and at most 4 risks.`;
       topbar.innerHTML = `
       <div class="brand-row">
         <button class="btn btn-icon" id="btn-to-projects" aria-label="All projects">${icons.projects}</button>
-        <div class="topbar-title">AI Investment Advisor</div>
+        <div class="topbar-title">AI Margin Optimizer</div>
       </div>
     `;
       document.getElementById("btn-to-projects").addEventListener("click", () => {
