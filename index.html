@@ -2372,7 +2372,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div class="sheet">
       <div class="sheet-handle"></div>
       <div class="sheet-header">
-        <h2>New Project</h2>
+        <h2>New Property</h2>
         <button class="btn btn-icon" data-act="close" aria-label="Close">${icons.close}</button>
       </div>
       <form id="new-project-form">
@@ -2920,7 +2920,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       onStatus?.("loading-engine");
       let createWorker;
       try {
-        ({ createWorker } = await loadTesseract());
+        const mod = await loadTesseract();
+        createWorker = mod.createWorker || mod.default && mod.default.createWorker;
+        if (typeof createWorker !== "function") {
+          throw new Error("createWorker not found on the loaded OCR module");
+        }
       } catch (err) {
         throw new Error("Could not load the OCR engine. An internet connection is required the first time you scan equipment.");
       }
