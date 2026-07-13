@@ -3807,81 +3807,71 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   var generatorPromise = null;
 
   var SYSTEM_PROMPT = `You are an AI Acquisition Assistant for Spark Homes.
-  Spark Homes purchases residential properties, renovates them, and resells them for profit.
-  Your job is to review an inspection report BEFORE an acquisition offer is submitted.
-  You are NOT an investment advisor.
-  You are NOT a real estate appraiser.
-  You are NOT a contractor.
+  Spark Homes purchases residential properties, renovates them, and resells them.
+  Your role is NOT to decide whether the property should be purchased.
+  Your job is to review the inspection and identify operational issues that should be addressed BEFORE an acquisition offer is submitted.
+  Use ONLY the information provided.
+  Never invent:
+  - market values
+  - comparable sales
+  - neighborhood information
+  - contractor pricing
+  - historical repair costs
+  - property appreciation
+  - inspection findings that were not provided
 
-  Only use the information provided by the user.
-  Never invent market prices, neighborhood information, contractor rates, comparable sales, property values, or repair costs.
-  Your goal is to improve inspection quality and reduce uncertainty.
-  Provide insights that are NOT obvious from simply looking at the repair totals.
+  If information is missing, explicitly state that it is missing instead of guessing.
+  Your recommendations must focus on evidence.
+  Every recommendation must reference one or more inspection items present in the input.
+  If a recommendation cannot cite an inspection item, do not include it.
 
-  Focus on:
-  • Missing inspection information
-  • Missing equipment documentation
-  • Repairs that should be validated before submitting an offer
-  • Opportunities to bundle similar work across multiple rooms
-  • Repair items that deserve additional contractor quotes
-  • Areas where missing documentation increases financial uncertainty
-  • Operational actions that may improve acquisition margins
+  Do NOT:
+  - recommend buying or rejecting the property
+  - restate repair totals
+  - describe the largest repair category unless explaining WHY it deserves additional validation
+  - repeat recommendations
+  - repeat titles
+  - repeat reasoning
 
-  Do not simply restate repair totals.
+  Every recommendation must reference something specific from the inspection.
+  Return ONLY one JSON object.
+  Do not include explanations.
+  Do not include markdown.
+  Do not include code fences.
+  Do not include notes after the JSON.
+  Stop immediately after the closing }.
 
-  Every insight must identify:
-  - uncertainty,
-  - missing information,
-  - inspection quality,
-  - operational efficiency,
-  or
-  - an action that reduces acquisition risk.
-
-  If an insight only summarizes a number already visible in the report, do not include it.
-
-  Those observations alone do not provide business value.
-  Every recommendation must explain WHY it matters.
-  If the provided information is insufficient, explicitly state what additional information would improve confidence instead of guessing.
-  Respond ONLY with a valid JSON object using exactly this schema:
+  Schema:
   {
-    "confidence": 0-100,
-    "summary": "2-3 sentence executive summary.",
+    "confidence": <integer 0-100>,
+    "summary": "<2-3 sentence executive summary>",
     "insights": [
       {
-        "title": "Short title",
-        "reasoning": "Specific reasoning tied to the inspection data.",
+        "title": "<short title>",
+        "reasoning": "<specific reasoning tied to inspection data>",
         "impact": "high|medium|low"
       }
     ],
     "inspectionGaps": [
-      "Specific missing inspection information."
+      "<specific missing inspection information>"
     ],
     "marginRisks": [
-      "Specific operational or financial uncertainty."
+      "<specific operational uncertainty>"
     ],
     "requiresHumanReview": true
   }
 
   Rules:
+  - Always include ALL fields.
+  - Always include "insights", even if it is empty.
   - Maximum 5 insights.
-  - Maximum 4 inspection gaps.
-  - Maximum 4 margin risks.
-  - Do not repeat information already visible in the repair summary.
-  - Do not recommend buying or rejecting the property.
-  - Do not invent facts.
-  - Return ONLY the JSON object.
-  
-  The following information is NOT available unless explicitly listed above:
-  - contractor quotations
-  - roof inspection
-  - electrical inspection
-  - plumbing inspection
-  - structural inspection
-  - neighborhood pricing
-  - comparable properties
-  - market values
-
-  If any recommendation depends on this information, identify it as missing instead of assuming it.
+  - Maximum 4 inspectionGaps.
+  - Maximum 4 marginRisks.
+  - Every insight title must be unique.
+  - Every insight must describe a different finding.
+  - If fewer than five meaningful insights exist, return fewer.
+  - Never fabricate information to reach five insights.
+  - Return ONLY JSON.
   `;
   
   async function loadGenerator(onProgress) {
@@ -4015,20 +4005,68 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     }
 
     lines.push("");
-    lines.push("=== BUSINESS OBJECTIVE ===");
-    lines.push("Spark Homes acquires residential properties for renovation and resale.");
-    lines.push("Do NOT decide whether the property should be purchased.");
-    lines.push("Instead, review the inspection for uncertainty, missing information, operational improvements, contractor validation opportunities, duplicate work across rooms, and ways the acquisition team could reduce repair uncertainty before submitting an offer.");
-    lines.push("");
-    lines.push("Focus on recommendations that:");
-    lines.push("- identify missing inspection information");
-    lines.push("- identify missing equipment documentation");
-    lines.push("- identify repair items that should be validated");
-    lines.push("- identify work that can be bundled across rooms");
-    lines.push("- identify opportunities to reduce uncertainty");
-    lines.push("- explain WHY each recommendation matters");
-    lines.push("- DO NOT simply restate the largest repair categories");
+    lines.push("=== PRE-COMPUTED BUSINESS FINDINGS ===");
 
+    // Budget concentration
+    const sortedCategories = [...categories].sort((a, b) => b.total - a.total);
+    sortedCategories.slice(0, 3).forEach((c, i) => {
+      const pct = totalRepairCost
+        ? ((c.total / totalRepairCost) * 100).toFixed(1)
+        : "0";
+
+      lines.push(
+        `Top Cost ${i + 1}: ${c.group} ($${Math.round(c.total)}, ${pct}% of repair budget)`
+      );
+    });
+
+    // Rooms with highest repair spend
+    const roomTotals = {};
+    rows.forEach(r => {
+      const room = r.roomName || "Unknown Room";
+      roomTotals[room] = (roomTotals[room] || 0) + (r.lineTotal || 0);
+    });
+
+    Object.entries(roomTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .forEach(([room, total]) => {
+        lines.push(`High-cost room: ${room} ($${Math.round(total)})`);
+      });
+
+    // Repeated repair types
+    const repairFrequency = {};
+    rows.forEach(r => {
+      const key = (r.category || r.name || "Unknown").trim();
+      repairFrequency[key] = (repairFrequency[key] || 0) + 1;
+    });
+
+    Object.entries(repairFrequency)
+      .filter(([_, count]) => count > 1)
+      .forEach(([repair, count]) => {
+        lines.push(`Repeated repair: ${repair} appears ${count} times`);
+      });
+
+    // Missing notes
+    const missingNotes = rows.filter(r => !r.notes).length;
+    lines.push(`Repair items without notes: ${missingNotes}`);
+
+    // Missing equipment
+    lines.push(`Equipment records captured: ${equipmentCount}`);
+
+    if (equipmentCount === 0) {
+      lines.push("No equipment documentation is available.");
+    }
+
+    // Large-value repairs
+    rows
+      .filter(r => (r.lineTotal || 0) > 1000)
+      .sort((a, b) => b.lineTotal - a.lineTotal)
+      .slice(0, 8)
+      .forEach(r => {
+        lines.push(
+          `Large repair: ${r.roomName || "Unknown"} | ${r.name || r.category} | $${Math.round(r.lineTotal)}`
+        );
+      });
     return lines.join("\n");
   }
   function tryParseJson(text) {
@@ -4044,17 +4082,27 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     return null;
   }
   function validateReportShape(obj) {
-    if (!obj || typeof obj !== "object") return false;
-    if (typeof obj.confidence !== "number") return false;
-    if (typeof obj.summary !== "string") return false;
-    if (!Array.isArray(obj.insights)) return false;
-    if (!Array.isArray(obj.inspectionGaps)) return false;
-    if (!Array.isArray(obj.marginRisks)) return false;
+    if (!obj || typeof obj !== "object")
+      return false;
+    if (typeof obj.confidence !== "number")
+      obj.confidence = 50;
+    if (typeof obj.summary !== "string")
+      obj.summary = "No summary generated.";
+    if (!Array.isArray(obj.insights))
+      obj.insights = [];
+    if (!Array.isArray(obj.inspectionGaps))
+      obj.inspectionGaps = [];
+    if (!Array.isArray(obj.marginRisks))
+      obj.marginRisks = [];
+    if (typeof obj.requiresHumanReview !== "boolean")
+      obj.requiresHumanReview = true;
+
     return true;
   }
   function normalizeReport(obj) {
-    requiresHumanReview: !!obj.requiresHumanReview
-    
+    if (!obj) {
+      throw new Error("normalizeReport called with null");
+    }
     const priorityRank = {
       high: 0,
       medium: 1,
@@ -4091,105 +4139,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
         String(obj.summary).slice(0,800),
       recommendations,
       risks,
-      expectedProfitIncrease:0
+      expectedProfitIncrease:0,
+      requiresHumanReview: !!obj.requiresHumanReview
     };
   }
-  // function buildFallbackReport(project, rows, categories, financials) {
-  //   const total = rows.reduce((s, r) => s + r.lineTotal, 0);
-  //   let opportunityScore = 50;
-  //   if (financials) {
-  //     if (financials.roi >= 30) opportunityScore = 90;
-  //     else if (financials.roi >= 20) opportunityScore = 80;
-  //     else if (financials.roi >= 10) opportunityScore = 65;
-  //     else if (financials.roi >= 0) opportunityScore = 50;
-  //     else opportunityScore = 25;
-  //   }
-
-  //   const recommendations = [];
-  //   // Highest-cost category
-  //   if (categories.length > 0) {
-  //     const top = categories[0];
-  //     recommendations.push({
-  //       title: `Validate ${top.group} estimate`,
-  //       reasoning: `${top.group} represents the largest portion of the repair budget. Obtain an additional contractor quote before finalizing the acquisition estimate.`,
-  //       priority: "high"
-  //     });
-  //   }
-
-  //   // Concentrated repair costs
-  //   const top3Total = categories.slice(0, 3).reduce((s, c) => s + c.total, 0);
-  //   if (total > 0 && top3Total / total > 0.6) {
-  //     recommendations.push({
-  //       title: "Focus on major cost drivers",
-  //       reasoning: "A large share of the repair budget is concentrated in a few categories. Small cost reductions in these areas can materially improve acquisition margins.",
-  //       priority: "medium"
-  //     });
-  //   }
-
-  //   // Large repair estimate
-  //   if (project.purchasePrice && total > project.purchasePrice * 0.4) {
-  //     recommendations.push({
-  //       title: "Verify high repair scope",
-  //       reasoning: "Repairs represent a significant percentage of the purchase price. Confirm major structural and mechanical items before submitting an offer.",
-  //       priority: "high"
-  //     });
-  //   }
-
-  //   // Equipment
-  //   const scannedEquipment = rows.filter(r => r.equipment).length;
-  //   if (scannedEquipment === 0) {
-  //     recommendations.push({
-  //       title: "Capture equipment information",
-  //       reasoning: "No HVAC or appliance equipment has been documented. Recording manufacturer, model and serial numbers can reduce uncertainty during repair estimation.",
-  //       priority: "medium"
-  //     });
-  //   }
-
-  //   const risks = [];
-  //   // ROI Risk
-  //   if (financials) {
-  //     if (financials.roi < 10) {
-  //       risks.push(
-  //         "Current projected ROI is below the target margin. Small increases in repair costs could significantly reduce profitability."
-  //       );
-  //     } else if (financials.roi < 20) {
-  //       risks.push(
-  //         "Projected ROI leaves limited room for unexpected repair costs."
-  //       );
-  //     }
-  //   }
-
-  //   // High repair ratio
-  //   if (project.purchasePrice && total > project.purchasePrice * 0.5) {
-  //     risks.push(
-  //       "Repair costs exceed half of the purchase price. Verify that no major inspection items have been overlooked."
-  //     );
-  //   }
-
-  //   if (risks.length === 0) {
-  //     risks.push(
-  //       "No significant numerical risk indicators were detected. Complete contractor validation and a final walkthrough before placing an offer."
-  //     );
-  //   }
-
-  //   const executiveSummary = financials
-  //     ? `The current estimate projects approximately $${Math.round(
-  //         financials.profit
-  //       )} in profit with an estimated ${financials.roi.toFixed(
-  //         1
-  //       )}% ROI. The repair estimate appears financially viable based on the available information, but final profitability depends on validating the highest-cost repair categories and completing any remaining inspection items.`
-  //     : `The total repair estimate is $${Math.round(
-  //         total
-  //       )}. Add the purchase price and after-repair value to evaluate expected profitability and acquisition margin.`;
-
-  //   return {
-  //     opportunityScore,
-  //     executiveSummary,
-  //     recommendations: recommendations.slice(0, 5),
-  //     risks: risks.slice(0, 4),
-  //     expectedProfitIncrease: 0
-  //   };
-  // }
   var aiService = {
     async generateReport(project, { onStatus } = {}) {
       const rows = await exportService.gatherLineItems(project);
@@ -4203,11 +4156,6 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       }).filter(Boolean);
       onStatus?.("loading-engine");
       let generator = await loadGenerator((p) => onStatus?.("downloading-model", p));
-      // try {
-      //   generator = await loadGenerator((p) => onStatus?.("downloading-model", p));
-      // } catch (err) {
-      //   return { ...buildFallbackReport(project, rows, categories, financials), model: "fallback-heuristic", usedFallback: true, engineError: err.message };
-      // }
       const userPrompt = buildUserPrompt(project, rows, categories, financials, equipmentSummary);
       const messages = [
         { role: "system", content: SYSTEM_PROMPT },
@@ -4217,16 +4165,23 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       let parsed = null;
       for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
         const promptMessages = attempt === 0 ? messages : [...messages, { role: "assistant", content: "(invalid JSON)" }, { role: "user", content: "That was not valid JSON. Respond again with ONLY the JSON object, no other text." }];
-        try {
-          const output = await generator(promptMessages, { max_new_tokens: 700, do_sample: false });
-          const text = output?.[0]?.generated_text?.at?.(-1)?.content || "";
-          const candidate = tryParseJson(text);
-          if (candidate && validateReportShape(candidate)) parsed = candidate;
-        } catch (err) {
+        const output = await generator(promptMessages, { max_new_tokens: 700, do_sample: false });
+        const text = output?.[0]?.generated_text?.at?.(-1)?.content;
+        console.log("========== RAW MODEL OUTPUT ==========");
+        console.log(text);
+        console.log("======================================");       
+        const candidate = tryParseJson(text);
+        if (!candidate) {
+          console.error("Model did not return valid JSON");
         }
-      }
-      if (!parsed) {
-        return { ...buildFallbackReport(project, rows, categories, financials), model: "fallback-heuristic", usedFallback: true };
+        else if (!validateReportShape(candidate)) {
+          console.error("JSON schema validation failed");
+          console.log(candidate);
+        }
+        else {
+          validateReportShape(candidate);
+          parsed = candidate;
+        }
       }
       return { ...normalizeReport(parsed), model: MODEL_ID, usedFallback: false };
     }
