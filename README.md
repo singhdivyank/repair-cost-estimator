@@ -35,55 +35,12 @@ Built as a single set of static files: **no build step, no bundler, no required 
 
 All CDN dependencies are loaded via dynamic `import()` at the moment they're needed, so the initial page load stays small. The service worker caches them after first successful load, so repeat use (OCR, export, AI) works fully offline.
 
-## Project Structure
-
-```
-spark-estimator/
-├── index.html                  # App shell
-├── manifest.json                # PWA manifest
-├── sw.js                        # Service worker (offline cache)
-├── css/styles.css               # Design system + all component styles
-├── assets/logo.png
-├── icons/                       # Generated PWA icons (192/512, regular + maskable)
-└── js/
-    ├── app.js                   # Bootstrap + router
-    ├── core/
-    │   ├── db.js                 # IndexedDB wrapper (source of truth)
-    │   ├── localStore.js         # localStorage wrapper
-    │   ├── icons.js               # Inline SVG icon set
-    │   └── utils.js
-    ├── data/
-    │   ├── priceList.js           # 108 catalog items, generated from Pricing_List.csv
-    │   └── roomTemplates.js       # 5 sections / 19 groups / room-type definitions
-    ├── repositories/              # One per entity — all IndexedDB access goes through these
-    │   ├── projectRepository.js
-    │   ├── roomRepository.js
-    │   ├── repairRepository.js
-    │   ├── photoRepository.js
-    │   ├── equipmentRepository.js
-    │   └── aiReportRepository.js
-    ├── services/
-    │   ├── pricingService.js      # Catalog + override resolution, totals, progress
-    │   ├── photoService.js        # Capture + thumbnail generation
-    │   ├── ocrService.js          # Equipment label OCR pipeline
-    │   ├── exportService.js       # Excel / ZIP export
-    │   ├── aiService.js           # On-device AI Investment Advisor
-    │   └── speechService.js       # Voice narration
-    └── screens/
-        ├── projectsScreen.js
-        ├── newProjectWizard.js
-        ├── roomsScreen.js
-        ├── roomDetailScreen.js
-        ├── summaryScreen.js
-        └── aiAdvisorScreen.js
-```
-
 ## Running It Locally
 
 Because the app uses native ES modules (`<script type="module">`), it must be served over HTTP(S) — opening `index.html` directly via `file://` will fail (browsers block module imports from the file protocol).
 
 ```bash
-cd spark-estimator
+cd repair-cost-estimator
 python3 -m http.server 8080
 # then open http://localhost:8080
 ```
@@ -98,26 +55,6 @@ This is the part that trips people up: a few of the app's features have **browse
 - The "Add to Home Screen" / install prompt requires the same.
 
 So `python3 -m http.server` on your laptop, opened from your phone via your laptop's LAN IP (`http://192.168.x.x:8080`), **will load the app and most features will work** (camera capture, OCR, export, AI Advisor — none of those need HTTPS), but the service worker won't register, so it won't be installable and won't work offline. For a real test of the offline/PWA behavior, you need HTTPS.
-
-### Recommended: GitHub Pages (free, HTTPS, matches your submission anyway)
-
-Since the take-home asks for a GitHub repo regardless, this is the path of least resistance:
-
-1. Push this project to a GitHub repo (root of the repo, or a subfolder — see note below).
-2. In the repo: **Settings → Pages → Source** → deploy from the branch/folder containing `index.html`.
-3. GitHub gives you a URL like `https://<username>.github.io/<repo>/`. Open that directly on your phone's browser (Safari or Chrome).
-4. From there you can "Add to Home Screen" (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Install app) and it'll behave like a native app, fully offline after first load.
-
-**Note on paths:** every path in this project (`manifest.json`, `sw.js` registration, all `<script>`/`<link>` references) is written relative (`./`), specifically so it works whether it's deployed at a domain root or under a subpath like `/repo-name/`. No changes needed either way.
-
-### Alternatives (also free, also HTTPS, and don't require a GitHub Pages setup step)
-
-- **Netlify Drop** ([app.netlify.com/drop](https://app.netlify.com/drop)) — drag the project folder into the browser, get an HTTPS URL in seconds. No account required for a quick test.
-- **Vercel** or **Cloudflare Pages** — connect the GitHub repo, auto-deploys on push, custom HTTPS URL.
-
-### If you need same-network HTTPS during active development
-
-Tools like [`ngrok`](https://ngrok.com) or [`localtunnel`](https://github.com/localtunnel/localtunnel) can put a temporary HTTPS URL in front of your local dev server (`ngrok http 8080`), so you can test service worker/install behavior on your phone before you've deployed anywhere. Useful for iterating quickly; not something to rely on for the actual submission link.
 
 ## Known Limitations
 
